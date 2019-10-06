@@ -1,0 +1,14 @@
+global:
+
+route:
+  group_by: ['alertname', 'application']
+  group_wait: 3s
+  group_interval: 5s
+  repeat_interval: 1m
+  receiver: slack-receiver
+
+receivers:
+- name: 'slack-receiver'
+  slack_configs:
+  - api_url: https://hooks.slack.com/services/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
+    channel: '#prom-alert'

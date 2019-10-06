@@ -1,0 +1,45 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+      - id: user-service
+        uri: lb://user-service
+        predicates:
+        - Path=/user/**
+        filters:
+        - RewritePath=/user/(?<path>.*), /$\{path}
+      - id: greeting-service
+        uri: lb://greeting-service
+        predicates:
+        - Path=/greeting/**
+        filters:
+        - RewritePath=/greeting/(?<path>.*), /$\{path}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  metrics:
+      distribution:
+        percentiles-histogram.http.server.requests: true
+        sla.http.server.requests: 500ms, 2000ms
+
+eureka:
+  instance:
+    metadata-map:
+      metrics.path: ${management.context-path:/actuator}/${endpoints.prometheus.id:prometheus}
+      health.path: ${management.context-path:/actuator}/${endpoints.health.id:health}
+      management.context-path: ${management.context-path:/actuator}
+  client:
+    service-url:
+      defaultZone: ${SERVICE_DISCOVERY_URL}

@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules.yml"
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "alertmanager:9093"
+
+scrape_configs:
+- job_name: prometheus
+  scrape_interval: 15s
+  scrape_timeout: 15s
+  metrics_path: /metrics
+  static_configs:
+  - targets:
+    - localhost:9090
+    
+- job_name: java-applications
+  scrape_interval: 15s
+  scrape_timeout: 15s
+  metrics_path: /metrics
+  consul_sd_configs:
+  - server: service-discovery:8061
+    tag_separator: ','
+    allow_stale: true
+    refresh_interval: 30s
+    services: []
+  relabel_configs:
+  - source_labels: [__meta_consul_service]
+    separator: ;
+    regex: (.*)
+    target_label: application
+    replacement: ${1}
+    action: replace
+  - source_labels: [__meta_consul_metadata_metrics_path]
+    separator: ;
+    regex: (.*)
+    target_label: __metrics_path__
+    replacement: ${1}
+    action: replace
+  - source_labels: [__address__]
+    separator: ;
+    regex: (.*)
+    target_label: instance
+    replacement: ${1}
+    action: replace

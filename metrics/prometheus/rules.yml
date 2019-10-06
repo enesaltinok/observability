@@ -1,0 +1,36 @@
+groups:
+- name: apdex
+  rules:
+  - record: http_server_requests_apdex
+    expr: |
+      ( 
+        sum(
+          rate(
+            http_server_requests_seconds_bucket{le="0.5", status="200", uri!~"/actuator.*"}[1m]
+          )
+        ) by (application) 
+        + 
+        sum(
+          rate(
+            http_server_requests_seconds_bucket{le="2.0", status="200", uri!~"/actuator.*"}[1m]
+          )
+        ) by (application) 
+      )
+      /
+      2
+      /
+      sum(
+        rate(
+          http_server_requests_seconds_count{uri!~"/actuator.*"}[1m]
+        )
+      ) by (application)
+
+  - alert: HttpServerRequestsApdexViolation
+    expr: http_server_requests_apdex < 0.8
+    for: 1m
+    labels:
+      severity: 'warning'
+      department: 'phoenix'
+    annotations:
+      description: |
+        {{ $labels.application }} http server requests apdex has dropped below 0.8, value: {{printf "%.2f" $value}}

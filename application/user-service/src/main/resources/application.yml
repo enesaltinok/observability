@@ -1,0 +1,55 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: user-service
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+logging:
+  level:
+    org.zalando.logbook: TRACE
+
+tracing:
+  service-name: ${spring.application.name}
+  host: ${JAEGER_HOST}
+  udp-port: ${JAEGER_PORT}
+  log-spans: false
+  sampler:
+    type: constant
+    constant: 1
+    probabilistic: 0.0
+    rate-limiting: 0.0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  metrics:
+    distribution:
+      percentiles-histogram.http.server.requests: true
+      sla.http.server.requests: 500ms, 2000ms
+
+eureka:
+  instance:
+    metadata-map:
+      metrics.path: ${management.context-path:/actuator}/${endpoints.prometheus.id:prometheus}
+      health.path: ${management.context-path:/actuator}/${endpoints.health.id:health}
+      management.context-path: ${management.context-path:/actuator}
+  client:
+    service-url:
+      defaultZone: ${SERVICE_DISCOVERY_URL}
+

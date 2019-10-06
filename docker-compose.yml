@@ -1,0 +1,185 @@
+version: '3'
+services:
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.8.1
+    container_name: elasticsearch
+    hostname: elasticsearch
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+    networks:
+      - emlakjet
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:6.8.1
+    container_name: logstash
+    hostname: logstash
+    command: logstash -f /etc/logstash/conf.d/logstash.conf
+    volumes:
+      - ./logging/logstash.conf:/etc/logstash/conf.d/logstash.conf
+    ports:
+      - "5000:5000/udp"
+      - "5001:5001/udp"
+    networks:
+      - emlakjet
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.8.1
+    container_name: kibana
+    hostname: kibana
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+    networks:
+      - emlakjet
+
+  prometheus:
+    image: prom/prometheus:v2.11.1
+    volumes:
+      - ./metrics/prometheus/prometheus.yml/:/etc/prometheus/prometheus.yml
+      - ./metrics/prometheus/rules.yml/:/etc/prometheus/rules.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    links:
+      - service-discovery
+    ports:
+      - 9090:9090
+    networks:
+      - emlakjet
+
+  alertmanager:
+    image: prom/alertmanager:v0.18.0
+    depends_on:
+      - prometheus
+    volumes:
+      - ./metrics/alertmanager/alertmanager.yml/:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - 9093:9093
+    networks:
+      - emlakjet
+
+  grafana:
+    image: grafana/grafana:6.2.5
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - ./metrics/grafana/provisioning/:/etc/grafana/provisioning/
+    networks:
+      - emlakjet
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.12
+    ports:
+      - 5775:5775/udp
+      - 6831:6831/udp
+      - 6832:6832/udp
+      - 5778:5778
+      - 16686:16686
+      - 14268:14268
+      - 9411:9411
+    networks:
+      - emlakjet
+
+  service-discovery:
+    build: ./application/service-discovery
+    volumes:
+      - ./application/service-discovery:/service-discovery
+    working_dir: /service-discovery
+    ports:
+      - 8061:8061
+    environment:
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+    command: java -jar ./target/service-discovery.jar
+    restart: always
+    networks:
+      - emlakjet
+
+  api-gateway:
+    build: ./application/api-gateway
+    volumes:
+      - ./application/api-gateway:/api-gateway
+    working_dir: /api-gateway
+    links:
+      - service-discovery
+    environment:
+      - SERVICE_DISCOVERY_URL=http://service-discovery:8061/eureka/
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+    ports:
+      - 8081:8081
+    command: java -jar ./target/api-gateway.jar
+    depends_on:
+      - service-discovery
+    restart: always
+    networks:
+      - emlakjet
+
+  user-service:
+    build: ./application/user-service
+    volumes:
+      - ./application/user-service:/user-service
+    working_dir: /user-service
+    links:
+      - service-discovery
+    environment:
+      - SERVICE_DISCOVERY_URL=http://service-discovery:8061/eureka/
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+    ports:
+      - 8083:8083
+    command: java -jar ./target/user-service.jar
+    depends_on:
+      - service-discovery
+    restart: always
+    networks:
+      - emlakjet
+
+  greeting-service:
+    build: ./application/greeting-service
+    volumes:
+      - ./application/greeting-service:/greeting-service
+    working_dir: /greeting-service
+    links:
+      - service-discovery
+    environment:
+      - SERVICE_DISCOVERY_URL=http://service-discovery:8061/eureka/
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5000
+      - JAEGER_HOST=jaeger
+      - JAEGER_PORT=6831
+    ports:
+      - 8082:8082
+    command: java -jar ./target/greeting-service.jar
+    depends_on:
+      - service-discovery
+    restart: always
+    networks:
+      - emlakjet
+
+networks:
+  emlakjet:

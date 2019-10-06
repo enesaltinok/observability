@@ -1,0 +1,76 @@
+# This is the main input for unit testing.
+# Only this file is passed as command line argument.
+
+rule_files:
+    - rules.yml
+
+evaluation_interval: 1m
+
+tests:
+    # Test 1.
+    - interval: 1m
+      # Series data.
+      input_series:
+          - series: 'http_server_requests_seconds_bucket{job="java-applications", application="USER-SERVICE", instance="192.168.1.1", le="0.5", status="200", uri="/user"}'
+            values: '2  4  160'
+          - series: 'http_server_requests_seconds_bucket{job="java-applications", application="USER-SERVICE", instance="192.168.1.1", le="2.0", status="200", uri="/user"}'
+            values: '5  10 44'
+          - series: 'http_server_requests_seconds_count{job="java-applications", application="USER-SERVICE", instance="192.168.1.1", uri="/user"}'
+            values: '10 20 210'
+          - series: 'http_server_requests_seconds_bucket{job="java-applications", application="GREETING-SERVICE", instance="192.168.1.2", le="0.5", status="200", uri="/greeting"}'
+            values: '8  16 121'
+          - series: 'http_server_requests_seconds_bucket{job="java-applications", application="GREETING-SERVICE", instance="192.168.1.2", le="2.0", status="200", uri="/greeting"}'
+            values: '0  2  10'
+          - series: 'http_server_requests_seconds_count{job="java-applications", application="GREETING-SERVICE", instance="192.168.1.2", uri="/greeting"}'
+            values: '9  20 132'
+
+      # Unit tests for promql expressions.
+      promql_expr_test:
+          # Unit test 1.
+          - expr: round(http_server_requests_apdex, 0.01)
+            eval_time: 1m
+            exp_samples:
+                # Sample 1.
+                - labels: '{application="USER-SERVICE"}'
+                  value: 0.35
+                # Sample 2.
+                - labels: '{application="GREETING-SERVICE"}'
+                  value: 0.45
+          # Unit test 2.
+          - expr: round(http_server_requests_apdex, 0.01)
+            eval_time: 2m
+            exp_samples:
+                # Sample 1.
+                - labels: '{application="USER-SERVICE"}'
+                  value: 0.50
+                # Sample 2.
+                - labels: '{application="GREETING-SERVICE"}'
+                  value: 0.50
+
+      # Unit test for alerting rules.
+      alert_rule_test:
+          # Unit test 1.
+          - eval_time: 2m
+            alertname: HttpServerRequestsApdexViolation
+            exp_alerts:
+                # Alert 1.
+                - exp_labels:
+                    application: USER-SERVICE
+                    severity: warning
+                    department: phoenix
+                  exp_annotations:
+                    description: "USER-SERVICE http server requests apdex has dropped below 0.8, value: 0.50"
+                # Alert 2.
+                - exp_labels:
+                    application: GREETING-SERVICE
+                    severity: warning
+                    department: phoenix
+                  exp_annotations:
+                    description: "GREETING-SERVICE http server requests apdex has dropped below 0.8, value: 0.50"
+
+
+
+
+
+
+

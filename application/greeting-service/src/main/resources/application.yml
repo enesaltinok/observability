@@ -1,0 +1,43 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: greeting-service
+  profiles:
+    active: dev
+
+logging:
+  level:
+    org.zalando.logbook: TRACE
+
+tracing:
+  service-name: ${spring.application.name}
+  host: ${JAEGER_HOST}
+  udp-port: ${JAEGER_PORT}
+  log-spans: false
+  sampler:
+    type: constant
+    constant: 1
+    probabilistic: 0.0
+    rate-limiting: 0.0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  metrics:
+      distribution:
+        percentiles-histogram.http.server.requests: true
+        sla.http.server.requests: 500ms, 2000ms
+
+eureka:
+  instance:
+    metadata-map:
+      metrics.path: ${management.context-path:/actuator}/${endpoints.prometheus.id:prometheus}
+      health.path: ${management.context-path:/actuator}/${endpoints.health.id:health}
+      management.context-path: ${management.context-path:/actuator}
+  client:
+    service-url:
+      defaultZone: ${SERVICE_DISCOVERY_URL}

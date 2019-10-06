@@ -1,0 +1,28 @@
+server:
+  port: 8061
+
+spring:
+  application:
+    name: service-discovery
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  metrics:
+      distribution:
+        percentiles-histogram.http.server.requests: true
+        sla.http.server.requests: 100ms,400ms
+
+eureka:
+  instance:
+    metadata-map:
+      metrics.path: ${management.context-path:/actuator}/${endpoints.prometheus.id:prometheus}
+      health.path: ${management.context-path:/actuator}/${endpoints.health.id:health}
+      management.context-path: ${management.context-path:/actuator}
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:${server.port}/eureka/
