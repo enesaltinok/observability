@@ -1,4 +1,4 @@
-# Three Pillars of Observability
+# Three Pillars of Observability!
 
 This project aims to show you three pillars of observability in action.  
 
